@@ -1,0 +1,4 @@
+# Preserve the exact upstream byte identities across Windows/Linux checkouts.
+src/** -text
+include/** -text
+LICENSE -text whitespace=cr-at-eol

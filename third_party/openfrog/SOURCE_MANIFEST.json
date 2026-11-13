@@ -1,0 +1,30 @@
+{
+  "project": "OpenFROG",
+  "repository": "https://github.com/TTPlayerRebuild/OpenFROG",
+  "commit": "5dc0c80cf0c357e8cadbbae9b593f1b3e62d917d",
+  "license": "MIT",
+  "files": {
+    "LICENSE": "8b81a13cd2d68788c27a641035728499d3c7691dabbc2b0bfa7e06e2c23dfde2",
+    "include/OptimFROG.h": "1371c35e497ee94dd33da6ee8a5662f17af6b50e265407c944235df1ab94d112",
+    "src/api.cpp": "779834698a5fc17430c6b4405e862d6d7c030e4badbd4ed5e97b1fad0846a861",
+    "src/codec.cpp": "85a4973f841efd75571001f7f723fc37f44c9bb9967ec4fd905a59062427e992",
+    "src/codec.hpp": "e1186adbbbeb15082e57aa1ff5b0e8f2154461e1b4adbe765993db0f29ddd0c7",
+    "src/codec_types.hpp": "b12b98166f7ecd09647dc9b39f986cbdeedbda427f351181a5a3605947650544",
+    "src/container.cpp": "d99c2302eae7cadc50b37b364fa47ba2245d7c3fe452c636d13122079582bede",
+    "src/container.hpp": "ad158286cc592d1be18e76baf21bcff61fbacc280ce324eca0454dd1c54b6709",
+    "src/entropy.cpp": "69e3cc22b8e1b4106b241109e9e33209616919a1c02e1ad62cdadc79d9aca3f9",
+    "src/entropy.hpp": "5a5d18683a0fa17f39a538513f68acc802d87be50af6e986f3fe52e554d15bdf",
+    "src/entropy3.cpp": "791b0879d3b3c3ebbbd67976c7af1f916562344fe6ebd97d0114e321fdd97dcb",
+    "src/entropy3.hpp": "391394c4de1fd3bb869924150d6b86fb3233d43f829aeced624d08b1040cc1be",
+    "src/mapping.cpp": "f08c9a4a8db0e75e6be5d2227145dc91c4d3d4e3d10bbebbcfa27c02244bcd0c",
+    "src/mapping.hpp": "6216ca0b2bfc22697f14a247e967e99d27e52492bb2564c4a33f34929fedc22e",
+    "src/pcm.cpp": "379430adab7ee1800d51dacec688fb2f2b0cf57c87561e41fa44644048a075ed",
+    "src/pcm.hpp": "5b975648477b52f6ff5d58ddc25e291a2457ba3e507a4e132be31fd73153b5c9",
+    "src/predictor.cpp": "3dc1c9ab5d68e05e78d6db86f1004bc680714e124e91541b6fc48d400d0bbfa8",
+    "src/predictor.hpp": "501bc7f347fc6e33eb534593e2e0a0c432d8f994493bb44c9806c7b9e7deb119",
+    "src/predictor_cascade.cpp": "4d54487d5877b732ac2a2231b75619bcab533c07c08ab2407874667b4bc238c1",
+    "src/predictor_cascade.hpp": "85c9af4571049111f81ccb9ee36629fc6476d29026ca003201b015dd43c5e5ad",
+    "src/predictor_lpc.cpp": "5752f82dc864a8726f441e324e5dc0a935f9d6d1d32252579a66c41df27fca80",
+    "src/predictor_lpc.hpp": "0c3c907196ac33a77909305bfda5ed4ccf370d28c1404ec859c3e5b2cea8cf02"
+  }
+}
