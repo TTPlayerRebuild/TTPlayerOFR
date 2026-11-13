@@ -440,6 +440,10 @@ int32_t OFR_CALL OptimFROG_read(void *instance, void *data, uint32_t points, con
     if (!d || !d->container || d->failed) { return -1; }
     if (!points || d->position == d->info.noPoints) { return 0; }
     if (!data) { return -1; }
+    // New OFRX/FLOAT32 support is an extension beyond the analyzed SDK. There
+    // is no native max16bit float contract; reject without consuming/poisoning
+    // state rather than truncate IEEE words or silently change buffer widths.
+    if (max16bit != C_FALSE && d->container->header().floating_point()) { return -1; }
     try {
         FloatingMode floating_mode;
         const uint64_t actual_points = (std::min)(uint64_t(points),

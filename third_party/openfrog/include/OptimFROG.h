@@ -101,6 +101,10 @@ OFR_API condition_t OFR_CALL OptimFROG_seekPoint(void *decoderInstance, sInt64_t
 OFR_API condition_t OFR_CALL OptimFROG_seekTime(void *decoderInstance, sInt64_t milliseconds);
 OFR_API sInt64_t OFR_CALL OptimFROG_getPos(void *decoderInstance);
 OFR_API condition_t OFR_CALL OptimFROG_recoverableErrors(void *decoderInstance);
+/* OpenFROG extension: OFRX FLOAT32_1/16/24 reads return exact little-endian
+   IEEE binary32 bits (4 bytes per scalar sample). max16bit is unsupported for
+   FLOAT32: a nonempty read returns -1 without consuming or poisoning state.
+   This is not a capability of the original 5.100 SDK DLL. */
 OFR_API sInt32_t OFR_CALL OptimFROG_read(void *decoderInstance, void *data, uInt32_t noPoints,
     condition_t max16bit OFR_DEFAULT(C_FALSE));
 OFR_API condition_t OFR_CALL OptimFROG_getInfo(void *decoderInstance, OptimFROG_Info *info);

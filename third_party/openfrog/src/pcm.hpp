@@ -13,8 +13,11 @@ namespace openfrog {
 // max16bit drops the low 8/16 bits of 24/32-bit PCM without rounding and has no
 // effect on 8/16-bit PCM. Destination byte alignment does not matter.
 //
-// This is only the integer PCM packing layer, NOT an audio decoder. Floating
-// types 8..10 and unknown types are rejected, including for a zero sample count.
+// Types 8..10 copy already-reconstructed IEEE binary32 bit patterns as four
+// little-endian bytes, without host floating-point arithmetic. max16bit for
+// FLOAT32 is explicitly unsupported (not integer truncation or normalization).
+// This is only a packing layer, NOT an audio decoder. Unknown types and float
+// max16bit are rejected, including for a zero sample count.
 // packed_pcm_size throws overflow_error if the output byte count cannot fit.
 std::size_t packed_pcm_size(std::size_t scalar_samples, std::uint8_t sample_type,
     bool max16bit);

@@ -44,10 +44,9 @@ Decoder::~Decoder() = default;
 void Decoder::open(Input& in) {
     impl_ = std::make_unique<Impl>(); auto& s = *impl_; s.input = &in;
     in.at(0); in.signature("OFR ", "OFRX");
-    BYTE signature[4]{}; in.exact(signature, 4); in.at(in.base);
-    // The statically linked backend retains the integer-only SDK scope.
-    // FLOAT32 identifiers in a header do not establish OFRX audio support.
-    require(memcmp(signature, "OFRX", 4) != 0, HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED));
+    // OFRX FLOAT32 requires real COMP/DETA pairs, validated by the backend.
+    // Read with max16bit=false and keep reconstructed IEEE32 words as bytes;
+    // no host float operation may quiet NaNs or change their payloads.
     static ReadInterface callbacks{Impl::close, Impl::read, Impl::eof, Impl::seekable, Impl::length, Impl::pos, Impl::at};
     s.context = OptimFROG_createInstance(); require(s.context, E_OUTOFMEMORY);
     auto ok = OptimFROG_openExt(s.context, &callbacks, &s, C_FALSE); check(s.error); require(ok != C_FALSE);

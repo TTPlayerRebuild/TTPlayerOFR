@@ -18,6 +18,15 @@ the user's original checkout, test data or build products. No adjacent repositor
 is needed to rebuild the plugin; only the normal pinned compatibility-toolchain
 downloads/caches are required.
 
+The current decoder-only snapshot is upstream clean commit `c37926c` (24 files).
+`float_details.cpp` is now linked; encoder, range encoder, WAVE/MD5 and standalone
+verification targets are not. OFRX integer layouts and real OFF COMP/DETA float
+pairs are accepted. Float output is little-endian IEEE binary32 words with no
+host float operation, normalization, sign-bit adaptation or max16 conversion.
+The Reader advertises IEEE_FLOAT/32 and keeps the existing packed public ABI.
+Damaged DETA reconstruction is fatal, never recovered as silence. As upstream,
+default decoding does not verify stored CRC/MD5: this is not a verify/check API.
+
 This removes the TEMP requirement for playback, information and seek. A metadata
 commit still uses safe replacement/backup files beside the audio file, then
 cleans them up. Those transactions are independent of codec loading and must not

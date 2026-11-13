@@ -11,7 +11,8 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
 add_library(ttp_openfrog_backend STATIC
   "${_openfrog}/src/api.cpp" "${_openfrog}/src/container.cpp"
   "${_openfrog}/src/entropy.cpp" "${_openfrog}/src/pcm.cpp"
-  "${_openfrog}/src/codec.cpp" "${_openfrog}/src/entropy3.cpp"
+  "${_openfrog}/src/codec.cpp" "${_openfrog}/src/float_details.cpp"
+  "${_openfrog}/src/entropy3.cpp"
   "${_openfrog}/src/mapping.cpp" "${_openfrog}/src/predictor.cpp"
   "${_openfrog}/src/predictor_lpc.cpp" "${_openfrog}/src/predictor_cascade.cpp")
 target_include_directories(ttp_openfrog_backend PUBLIC "${_openfrog}/include"

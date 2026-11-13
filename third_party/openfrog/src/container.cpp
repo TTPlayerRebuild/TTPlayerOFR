@@ -19,9 +19,12 @@ constexpr uint32_t fourcc(char a, char b, char c, char d) {
 }
 
 constexpr uint32_t kMain = fourcc('O', 'F', 'R', ' ');
+constexpr uint32_t kMainX = fourcc('O', 'F', 'R', 'X');
 constexpr uint32_t kHead = fourcc('H', 'E', 'A', 'D');
 constexpr uint32_t kComp = fourcc('C', 'O', 'M', 'P');
+constexpr uint32_t kDeta = fourcc('D', 'E', 'T', 'A');
 constexpr uint32_t kTail = fourcc('T', 'A', 'I', 'L');
+constexpr uint32_t kNoCrc = fourcc('N', 'O', 'N', 'E');
 
 uint16_t le16(const uint8_t *p) {
     return static_cast<uint16_t>(static_cast<uint16_t>(p[0])
@@ -207,6 +210,9 @@ void Container::validate_chunk(const Chunk &chunk) const {
     if (chunk.id == kComp && chunk.size < 14) {
         throw std::runtime_error("COMP payload is shorter than its 14-byte header");
     }
+    if (chunk.id == kDeta && chunk.size < 4) {
+        throw std::runtime_error("DETA payload is shorter than its CRC");
+    }
 }
 
 Container::Chunk Container::read_chunk() {
@@ -267,8 +273,9 @@ void Container::open(bool want_tags) {
             }
             for (;;) {
                 const uint32_t size = le32(window.data() + 4);
-                if (le32(window.data()) == kMain && size > 11 && size < 256) {
-                    main = Chunk{kMain, size, position_ - 8};
+                const uint32_t id = le32(window.data());
+                if ((id == kMain || id == kMainX) && size > 11 && size < 256) {
+                    main = Chunk{id, size, position_ - 8};
                     break;
                 }
                 if (prefix_bytes == kMaxContainerId3v2PrefixBytes) {
@@ -307,9 +314,10 @@ void Container::open(bool want_tags) {
             prefix_bytes += total;
             skip(size + footer);
         }
-        if (main.id != kMain) {
-            throw std::runtime_error("not an OFR container (legacy *RIFF/OFRX is unsupported)");
+        if (main.id != kMain && main.id != kMainX) {
+            throw std::runtime_error("not an OFR/OFRX container (legacy *RIFF is unsupported)");
         }
+        header_.ofrx = main.id == kMainX;
         validate_chunk(main);
         if (main.size < 15 || (!strict_checks_ && main.size > 79)) {
             throw std::runtime_error("invalid or unsupported OFR main-header length");
@@ -361,8 +369,10 @@ void Container::open(bool want_tags) {
                 pending_ = chunk;
                 have_pending_ = true;
                 break;
-            } else if (chunk.id == kMain) {
+            } else if (chunk.id == kMain || chunk.id == kMainX) {
                 throw std::runtime_error("duplicate OFR main block");
+            } else if (chunk.id == kDeta) {
+                throw std::runtime_error("DETA without a preceding FLOAT32 COMP block");
             } else {
                 if (!strict_checks_) { throw std::runtime_error("expected HEAD after OFR main header"); }
                 skip(chunk.size);
@@ -387,6 +397,14 @@ void Container::consume_tail(const Chunk &chunk) {
 }
 
 bool Container::next_audio_block(AudioBlock &block) {
+    return next_block(block, true);
+}
+
+bool Container::next_storage_block(AudioBlock &block) {
+    return next_block(block, false);
+}
+
+bool Container::next_block(AudioBlock &block, bool validate_sample_format) {
     require_open();
     if (finished_) {
         return false;
@@ -415,10 +433,10 @@ bool Container::next_audio_block(AudioBlock &block) {
                 result.file_offset = chunk.offset;
                 if (!result.sample_count || result.sample_count % header_.channels()
                     || result.sample_count > header_.total_samples - samples_read_
-                    || result.sample_type > 10 || result.channel_config > 1
-                    || result.sample_count % (result.channel_config + 1U)
-                    || (strict_checks_ && (result.sample_type != header_.sample_type
-                        || result.channel_config != header_.channel_config))) {
+                    || (validate_sample_format && (result.sample_type > 10 || result.channel_config > 1
+                        || result.sample_count % (result.channel_config + 1U)
+                        || ((strict_checks_ || header_.has_float_details()) && (result.sample_type != header_.sample_type
+                            || result.channel_config != header_.channel_config))))) {
                     throw std::runtime_error("inconsistent COMP sample count or format");
                 }
                 if (strict_checks_) {
@@ -444,6 +462,24 @@ bool Container::next_audio_block(AudioBlock &block) {
                 if (strict_checks_ && !result.crc_valid) {
                     throw std::runtime_error("COMP CRC32 mismatch");
                 }
+                if (header_.has_float_details()) {
+                    // OFF 004289f0/00427330: the DETA reader starts exactly at
+                    // COMP's declared end. Never search for or silently skip it.
+                    const Chunk details = read_chunk();
+                    if (details.id != kDeta) {
+                        throw std::runtime_error("FLOAT32 COMP is not followed by DETA");
+                    }
+                    uint8_t crc[4];
+                    read_exact(crc, sizeof(crc));
+                    result.has_float_details = true;
+                    result.details_crc = le32(crc);
+                    read_payload(result.details_coded, details.size - 4);
+                    result.details_crc_valid = result.details_crc == kNoCrc
+                        || crc32(result.details_coded.data(), result.details_coded.size()) == result.details_crc;
+                    if (strict_checks_ && !result.details_crc_valid) {
+                        throw std::runtime_error("DETA CRC32 mismatch");
+                    }
+                }
                 result.next_offset = position_;
                 if (index_.empty() || index_.back().offset < result.file_offset) {
                     index_.push_back(IndexEntry{result.file_offset, result.next_offset,
@@ -453,8 +489,11 @@ bool Container::next_audio_block(AudioBlock &block) {
                 block = std::move(result);
                 return true;
             }
-            if (chunk.id == kHead || chunk.id == kMain) {
+            if (chunk.id == kHead || chunk.id == kMain || chunk.id == kMainX) {
                 throw std::runtime_error("unexpected header block in audio data");
+            }
+            if (chunk.id == kDeta) {
+                throw std::runtime_error("DETA without a preceding FLOAT32 COMP block");
             }
             skip(chunk.size);
         }
@@ -505,7 +544,7 @@ void Container::read_tail() {
             if (chunk.id == kComp) {
                 throw std::runtime_error("COMP data exceeds the declared sample count");
             }
-            if (chunk.id == kHead || chunk.id == kMain) {
+            if (chunk.id == kHead || chunk.id == kMain || chunk.id == kMainX || chunk.id == kDeta) {
                 throw std::runtime_error("unexpected header block before TAIL");
             }
             skip(chunk.size);
@@ -566,7 +605,7 @@ bool Container::seek_audio(uint64_t target, uint64_t &block_start) {
             const Chunk chunk = read_chunk();
             if (chunk.id == kTail) { throw std::runtime_error("TAIL precedes seek target"); }
             if (chunk.id != kComp) {
-                if (chunk.id == kMain || chunk.id == kHead) {
+                if (chunk.id == kMain || chunk.id == kMainX || chunk.id == kHead || chunk.id == kDeta) {
                     throw std::runtime_error("unexpected header while indexing audio");
                 }
                 skip(chunk.size);
@@ -578,18 +617,27 @@ bool Container::seek_audio(uint64_t target, uint64_t &block_start) {
             if (!count || count > header_.total_samples - start
                 || count % header_.channels() || data[8] > 10 || data[9] > 1
                 || count % (data[9] + 1U)
-                || (strict_checks_ && (data[8] != header_.sample_type
+                || ((strict_checks_ || header_.has_float_details()) && (data[8] != header_.sample_type
                     || data[9] != header_.channel_config))) {
                 throw std::runtime_error("invalid COMP header while indexing audio");
             }
-            const int64_t next = position_ + (chunk.size - 14U);
+            int64_t next = position_ + (chunk.size - 14U);
+            if (header_.has_float_details()) {
+                skip(chunk.size - 14U);
+                const Chunk details = read_chunk();
+                if (details.id != kDeta) {
+                    throw std::runtime_error("FLOAT32 COMP is not followed by DETA while indexing");
+                }
+                skip(details.size);
+                next = position_;
+            }
             IndexEntry entry{chunk.offset, next, start, count};
             index_.push_back(entry);
             if (target - start < count) {
                 select(entry);
                 return true;
             }
-            skip(chunk.size - 14U);
+            if (!header_.has_float_details()) { skip(chunk.size - 14U); }
             start += count;
         }
     } catch (...) {

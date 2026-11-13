@@ -17,7 +17,12 @@ struct PcmLayout {
 PcmLayout layout_for(std::uint8_t sample_type, bool max16bit) {
     if (sample_type > 7) {
         if (sample_type <= 10) {
-            throw std::invalid_argument("floating-point PCM packing is not implemented");
+            if (max16bit) {
+                throw std::invalid_argument("max16bit has no lossless FLOAT32 representation");
+            }
+            // The words are reconstructed IEEE bits, not host float values.
+            // In particular, copying an sNaN must not quiet its payload.
+            return PcmLayout{4U, 0U, 0U};
         }
         throw std::invalid_argument("unknown PCM sample type");
     }

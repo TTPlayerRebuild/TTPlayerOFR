@@ -24,6 +24,7 @@ struct Tag {
 };
 
 struct Header {
+    bool ofrx = false;
     uint64_t total_samples = 0;
     uint8_t sample_type = 0;
     uint8_t channel_config = 0;
@@ -39,6 +40,8 @@ struct Header {
     }
     uint32_t version() const { return (encoder_id >> 4) + 4500U; }
     uint64_t points() const { return channels() ? total_samples / channels() : 0; }
+    bool floating_point() const { return sample_type >= 8 && sample_type <= 10; }
+    bool has_float_details() const { return ofrx && floating_point(); }
 };
 
 struct AudioBlock {
@@ -52,6 +55,12 @@ struct AudioBlock {
     int64_t file_offset = -1;
     int64_t next_offset = -1;
     bool crc_valid = false;
+    // Present only for a real OFRX FLOAT32 COMP/DETA pair. The range bytes
+    // include DETA's tag, but not its CRC. next_offset is AFTER both chunks.
+    bool has_float_details = false;
+    uint32_t details_crc = 0;
+    bool details_crc_valid = false; // Includes the documented NONE sentinel.
+    std::vector<uint8_t> details_coded;
 };
 
 // Resource limits of this implementation, NOT limits in the OptimFROG format.
@@ -67,6 +76,8 @@ uint32_t crc32(const uint8_t *data, std::size_t size);
 
 // Parses the documented >= 15-byte main-header format. This is a container and
 // tag reader, NOT an audio decoder. Input ownership/closing remains with the API.
+// Accepts OFR and OFRX. OFRX FLOAT32 audio requires adjacent COMP/DETA pairs;
+// standalone/missing DETA is never skipped as metadata, including while seeking.
 // Strict policy: COMP blocks must have nonzero, channel-aligned sample counts,
 // match the main sample format, and pass CRC32; no repair/silence substitution.
 // EOF before TAIL is an error, not a successful end of audio.
@@ -75,6 +86,9 @@ public:
     explicit Container(Input &input, bool strict_checks = true);
     void open(bool read_tags);
     bool next_audio_block(AudioBlock &block);
+    // CRC-only verification does not interpret the COMP codec/type selectors.
+    // It still enforces bounded chunks, sample totals and COMP/DETA adjacency.
+    bool next_storage_block(AudioBlock &block);
     // Does not skip COMP blocks. Call only after consuming all declared samples.
     void read_tail();
     bool rewind_audio();
@@ -128,6 +142,7 @@ private:
     Chunk read_chunk();
     Chunk take_chunk();
     void read_payload(std::vector<uint8_t> &data, uint32_t count);
+    bool next_block(AudioBlock &block, bool validate_sample_format);
     void consume_tail(const Chunk &chunk);
     void read_tags();
     void read_id3v1(const uint8_t *data);

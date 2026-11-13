@@ -1,6 +1,7 @@
 #include "codec.hpp"
 #include "entropy.hpp"
 #include "entropy3.hpp"
+#include "float_details.hpp"
 #include "mapping.hpp"
 #include "predictor.hpp"
 
@@ -17,6 +18,9 @@ unsigned sample_bits(std::uint8_t type) {
 }
 
 RangeDecoder block_range(AudioBlock &block) {
+    if (block.sample_type >= 8 && !block.has_float_details) {
+        throw UnsupportedCodec("FLOAT32 decoding requires an OFRX COMP/DETA pair");
+    }
     const unsigned mapping = block.internal & 0x3fU;
     const unsigned predictor = (block.internal >> 6) & 0x1fU;
     const unsigned entropy = block.internal >> 11;
@@ -49,6 +53,9 @@ public:
         case 3: entropy3_ = std::make_unique<EntropySelector3>(range_, spec.bit_width, channels_, total_); break;
         default: throw UnsupportedCodec("unknown entropy selector");
         }
+        if (block.has_float_details) {
+            details_ = std::make_unique<FloatDetails>(std::move(block.details_coded), total_);
+        }
     }
 
     std::vector<std::int32_t> read(std::size_t count) {
@@ -65,6 +72,7 @@ public:
             else { batch = entropy3_->decode(part); }
             predictor_->reconstruct(batch.data(), part);
             mapping_->apply(batch.data(), part);
+            if (details_) { details_->reconstruct(batch.data(), part); }
             samples.insert(samples.end(), batch.begin(), batch.end());
             consumed_ += static_cast<std::uint32_t>(part);
         }
@@ -80,6 +88,7 @@ private:
     std::unique_ptr<EntropySelector1> entropy1_;
     std::unique_ptr<EntropySelector2> entropy2_;
     std::unique_ptr<EntropySelector3> entropy3_;
+    std::unique_ptr<FloatDetails> details_;
 };
 
 } // namespace
@@ -106,6 +115,9 @@ public:
         } catch (const UnsupportedCodec &) { throw; }
         catch (const std::bad_alloc &) { throw; }
         catch (const std::exception &) {
+            // The OFF file decoder aborts on a broken DETA stream. Never turn
+            // an unimplemented/invalid float reconstruction into apparent +0.
+            if (container.header().floating_point()) { throw; }
             // 1000badf: the declared samples of a damaged block are concealed.
             block.reset();
             recovered = true;
@@ -131,6 +143,7 @@ public:
                 } catch (const UnsupportedCodec &) { throw; }
                 catch (const std::bad_alloc &) { throw; }
                 catch (const std::exception &) {
+                    if (container.header().floating_point()) { throw; }
                     block.reset();
                     recovered = true;
                     result.resize(old_size + part, 0);

@@ -13,7 +13,9 @@
 namespace openfrog {
 
 // Stateful compressed-stream decoder. Counts are interleaved scalar samples;
-// conversion to public points and packing belongs to the SDK boundary.
+// conversion to public points and packing belongs to the SDK boundary. For
+// OFRX FLOAT32, returned int32_t words carry raw IEEE bits after DETA, not numeric
+// integers; reconstruction errors are fatal rather than concealed as silence.
 class AudioDecoder {
 public:
     explicit AudioDecoder(Container &container);
